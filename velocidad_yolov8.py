@@ -24,7 +24,7 @@ classes_list=list(classes_dict.keys())
 
 
 # Open the video file
-video_path = "./videos_prueba/2.mp4"
+video_path = "./videos_prueba/1.mp4"
 cap = cv2.VideoCapture(video_path)
 
 # Create a video writer for the output video
@@ -64,7 +64,7 @@ def get_direction(last_pos, first_pos):
 
 
 def ppm_calculate(x_pos, y_pos):
-    with open('./pruebas/ppm_v3.pkl', 'rb') as f:
+    with open('./pruebas/ppm_real.pkl', 'rb') as f:
         model = pickle.load(f)
     return model.predict(PolynomialFeatures(2).fit_transform([[x_pos, y_pos]]))[0]
 
@@ -74,7 +74,7 @@ def estimate_speed(first_pos, last_pos, first_t, last_t):
     middle_point = (int((last_pos[0] + first_pos[0]) / 2), int((last_pos[1] + first_pos[1]) / 2))
     ppm = ppm_calculate(middle_point[0], middle_point[1])
     d_meters = d_pixels / ppm
-    dt = first_t - last_t  # in seconds
+    dt = last_t - first_t  # in seconds
     speed = d_meters / dt  # in m/s
     speed = speed * 3.6  # convert to km/h
     return int(speed)
@@ -100,14 +100,12 @@ while cap.isOpened():
         # Get the boxes and track IDs
         boxes = results[0].boxes.xywh
         
-        print(boxes)
 
         try:
             track_ids = results[0].boxes.id.int().tolist()
         except:
             track_ids = []
 
-        
         # Visualize the results on the frame
         annotated_frame = results[0].plot(
             line_width=2,  # thickness of bounding box and track line
@@ -133,6 +131,8 @@ while cap.isOpened():
                 speed_data[track_id] = deque(maxlen=30)
 
             center_bottom = (int(box_xc), int(box_yc + box_h / 2))
+
+
             track_history[track_id].appendleft((center_bottom, time.time()))
 
             current_track = track_history[track_id]
@@ -146,6 +146,8 @@ while cap.isOpened():
                     pos_x1, pos_y1 = current_track_pos[i-1][0], current_track_pos[i-1][1]
                     cv2.line(annotated_frame, (int(pos_x), int(pos_y)), (int(pos_x1), int(pos_y1)), (0, 0, 255), thickness)
 
+            print(speed_data)
+
             if len(current_track) > 1:
 
                 (pt1, t1), (pt2, t2) = current_track[0], current_track[1]
@@ -154,10 +156,15 @@ while cap.isOpened():
                 direction = get_direction(pt2, pt1)
                 object_speed = estimate_speed(pt1, pt2, t1, t2)
 
+
                 # Adding the speed of the vehicle to the dictionary
                 speed_data[track_id].appendleft(object_speed)
+                avg_speed = int(sum(speed_data[track_id]) / len(speed_data[track_id]))
+                cv2.putText(annotated_frame, f'{avg_speed} km/h', (int(pt1[0] - 15), int(pt1[1] - 15)), 0, 0.75, [0, 0, 255], thickness=2, lineType=cv2.LINE_AA)
+                
+
             
-                if intersect(current_track[0][0], current_track[1][0], line[0], line[1]):
+                if intersect(line[0], line[1],current_track[0][0], current_track[1][0]):
                     if direction == "South":
                         if track_id not in counter_enter:
                             counter_enter[track_id] = 1
