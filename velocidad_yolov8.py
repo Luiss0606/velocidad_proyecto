@@ -24,7 +24,7 @@ classes_list=list(classes_dict.keys())
 
 
 # Open the video file
-video_path = "./videos_prueba/1.mp4"
+video_path = "./videos_prueba/2.mp4"
 cap = cv2.VideoCapture(video_path)
 
 # Create a video writer for the output video
@@ -36,14 +36,14 @@ out = cv2.VideoWriter(output_path, codec, fps, frame_size)
 
 
 
-line = [(555, 565), (1073, 565)]
 count_up = 0
 count_down = 0
 
 # Store the track history
 track_history = defaultdict(lambda: [])
 speed_data = defaultdict(lambda: [])
-object_couter = defaultdict(lambda: [])
+counter_enter = defaultdict(lambda: [])
+counter_exit = defaultdict(lambda: [])
 
 def intersect(A, B, C, D):
     return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
@@ -55,7 +55,7 @@ def get_direction(last_pos, first_pos):
     direction = ""
 
     if first_pos[1] < last_pos[1]:
-        direction += "Shout"
+        direction += "South"
     elif first_pos[1] > last_pos[1]:
         direction += "North"
     else:
@@ -92,39 +92,45 @@ while cap.isOpened():
             frame, 
             persist=True,
             conf=0.7,
-            iou=0.8,
+            iou=0.7,
             device=0,
-            tracker='bytetrack.yaml',
+            tracker='botsort.yaml',
             classes=classes_list,)
 
         # Get the boxes and track IDs
         boxes = results[0].boxes.xywh
-        try :
+        
+        print(boxes)
+
+        try:
             track_ids = results[0].boxes.id.int().tolist()
         except:
-            pass
+            track_ids = []
 
-        print(track_ids)
         
         # Visualize the results on the frame
         annotated_frame = results[0].plot(
             line_width=2,  # thickness of bounding box and track line
+            conf=False,  # show confidence score
             font_size=2,  # font size of track ID
         )
         # Draw the line in the middle of the frame
-        cv2.line(annotated_frame, (0, int(annotated_frame.shape[0] / 2)), (annotated_frame.shape[1], int(annotated_frame.shape[0] / 2)), (46, 162, 112), 3)
+        line = [(0, int(annotated_frame.shape[0] / 2)), (annotated_frame.shape[1], int(annotated_frame.shape[0] / 2))]
+        cv2.line(annotated_frame, line[0], line[1], (46, 162, 112), 3)
 
-        
+
         # cv2.line(annotated_frame, (0, int(737.94654122)), (annotated_frame.shape[1], int(-0.22085729 * annotated_frame.shape[1] + 737.94654122)), (0, 0, 255), 3)
 
         # Plot the tracks
         for box, track_id in zip(boxes, track_ids):
+
             box_xc, box_yc, box_w, box_h = box
+
 
             # --------Tracking--------
             if track_id not in track_history:
                 track_history[track_id] = deque(maxlen=30)
-                speed_data[track_id] = []
+                speed_data[track_id] = deque(maxlen=30)
 
             center_bottom = (int(box_xc), int(box_yc + box_h / 2))
             track_history[track_id].appendleft((center_bottom, time.time()))
@@ -149,22 +155,45 @@ while cap.isOpened():
                 object_speed = estimate_speed(pt1, pt2, t1, t2)
 
                 # Adding the speed of the vehicle to the dictionary
-                speed_data[track_id].append(object_speed)
+                speed_data[track_id].appendleft(object_speed)
             
-                # if intersect(current_track[0][0], current_track[1][0], line[0], line[1]):
-                #     if direction == "North":
-                #         if track_id not in object_couter:
-                #             object_couter[track_id] = 1
-                #         else:
-                #             object_couter[track_id] += 1
-                #         count_down += 1
-                #     elif direction == "Shout":
-                #         count_down += 1
-                        
-
-
-
+                if intersect(current_track[0][0], current_track[1][0], line[0], line[1]):
+                    if direction == "South":
+                        if track_id not in counter_enter:
+                            counter_enter[track_id] = 1
+                        else:
+                            counter_enter[track_id] += 1
+                        count_up += 1
+                    elif direction == "North":
+                        if track_id not in counter_exit:
+                            counter_exit[track_id] = 1
+                        else:
+                            counter_exit[track_id] += 1
+                        count_down += 1
             # -----------------------------
+                
+
+
+        for idx, (key, value) in enumerate(counter_enter.items()): # Counter Enter
+            counter_enter_str = str(key) + ":" + str(value)
+            # Cars Entering
+            cv2.putText(annotated_frame, f'Vehicles Entering', (frame.shape[1] - 500, 35), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+            ###
+            cv2.putText(annotated_frame, "Total Count: "+str(count_up), (frame.shape[1] - 500, 75), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+
+            ###
+            cv2.putText(annotated_frame, counter_enter_str, (frame.shape[1] - 200, 105 + (idx*40)), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+
+        for idx, (key, value) in enumerate(counter_exit.items()): # Counter Exit
+            counter_exit_str = str(key) + ":" + str(value)
+            # Cars Leaving
+            cv2.putText(annotated_frame, f'Vehicles Leaving', (11, 35), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+            ###
+            cv2.putText(annotated_frame, "Total Count: " +str(count_down), (11, 75), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+
+            ###
+            cv2.putText(annotated_frame, counter_exit_str, (11, 105+ (idx*40)), 0, 1, [255, 0, 0], thickness=2, lineType=cv2.LINE_AA)
+
 
         cv2.imshow("YOLOv8 Tracking", annotated_frame)
 
