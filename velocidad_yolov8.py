@@ -24,8 +24,12 @@ classes_list=list(classes_dict.keys())
 
 
 # Open the video file
-video_path = "./videos_prueba/1.mp4"
-cap = cv2.VideoCapture(video_path)
+# video_path = "./velocidad_pic/6.mp4"
+
+
+cap = cv2.VideoCapture(0)
+# Cambiamos la resolucion de la camara a 1920x1080
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 
 # Create a video writer for the output video
 output_path = "./runs/1_annotated.mp4"
@@ -64,7 +68,7 @@ def get_direction(last_pos, first_pos):
 
 
 def ppm_calculate(x_pos, y_pos):
-    with open('./pruebas/ppm_real.pkl', 'rb') as f:
+    with open('./velocidad_pic/ppm.pkl', 'rb') as f:
         model = pickle.load(f)
     return model.predict(PolynomialFeatures(2).fit_transform([[x_pos, y_pos]]))[0]
 
@@ -74,9 +78,15 @@ def estimate_speed(first_pos, last_pos, first_t, last_t):
     middle_point = (int((last_pos[0] + first_pos[0]) / 2), int((last_pos[1] + first_pos[1]) / 2))
     ppm = ppm_calculate(middle_point[0], middle_point[1])
     d_meters = d_pixels / ppm
-    dt = last_t - first_t  # in seconds
+    # Taking the time in seconds, we take te positive value of the difference
+    dt = abs(last_t - first_t)
     speed = d_meters / dt  # in m/s
     speed = speed * 3.6  # convert to km/h
+    print("Speed: ", speed)
+    print("Pixels: ", d_pixels)
+    print("PPM: ", ppm)
+    print("Meters: ", d_meters)
+    print("Time: ", dt)
     return int(speed)
 
 
@@ -85,6 +95,7 @@ def estimate_speed(first_pos, last_pos, first_t, last_t):
 while cap.isOpened():
     # Read a frame from the video
     success, frame = cap.read()
+    print(frame.shape)
 
     if success:
         # Run YOLOv8 tracking on the frame, persisting tracks between frames
@@ -127,8 +138,8 @@ while cap.isOpened():
 
             # --------Tracking--------
             if track_id not in track_history:
-                track_history[track_id] = deque(maxlen=30)
-                speed_data[track_id] = deque(maxlen=30)
+                track_history[track_id] = deque(maxlen=10)
+                speed_data[track_id] = deque(maxlen=10)
 
             center_bottom = (int(box_xc), int(box_yc + box_h / 2))
 
@@ -145,8 +156,6 @@ while cap.isOpened():
                     thickness = int(np.sqrt(64 / float(i+i)) * 1.5)
                     pos_x1, pos_y1 = current_track_pos[i-1][0], current_track_pos[i-1][1]
                     cv2.line(annotated_frame, (int(pos_x), int(pos_y)), (int(pos_x1), int(pos_y1)), (0, 0, 255), thickness)
-
-            print(speed_data)
 
             if len(current_track) > 1:
 
