@@ -1,6 +1,6 @@
 import math
 import pickle
-
+import cv2
 
 from sklearn.preprocessing import PolynomialFeatures
 
@@ -46,3 +46,12 @@ def estimate_speed(first_pos, last_pos, first_t, last_t):
     print("Time: ", dt)
     return int(speed)
 
+# Save the output video
+def save_output(video_capture):
+    output_path = "./runs/video_output.mp4"
+    codec = cv2.VideoWriter_fourcc(*"XVID")
+    fps = int(video_capture.get(cv2.CAP_PROP_FPS))
+    frame_size = (int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)), 
+                  int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    out = cv2.VideoWriter(output_path, codec, fps, frame_size)
+    return out

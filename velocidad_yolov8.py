@@ -1,6 +1,5 @@
 from collections import defaultdict
 
-import cv2
 import numpy as np
 import time
 
@@ -13,7 +12,6 @@ from ultralytics import YOLO
 model = YOLO('yolov8m.pt')
 # https://docs.ultralytics.com/datasets/detect/coco/#dataset-yaml
 classes_dict = {
-    0: 'person',
     2: 'car',
     3: 'motorcycle',
     5: 'bus',
@@ -26,17 +24,9 @@ classes_list=list(classes_dict.keys())
 video_path = "./velocidad_pic/7.mp4"
 
 
+# cap = cv2.VideoCapture("rtsp://admin:Hik12345@192.168.30.31:554/Streaming/channels/101")
 cap = cv2.VideoCapture(video_path)
-# Cambiamos la resolucion de la camara a 1920x1080
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-
-# Create a video writer for the output video
-output_path = "./runs/1_annotated.mp4"
-codec = cv2.VideoWriter_fourcc(*"XVID")  # You can change the codec as needed
-fps = int(cap.get(cv2.CAP_PROP_FPS))
-frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-out = cv2.VideoWriter(output_path, codec, fps, frame_size)
-
+# out = save_output(cap)
 
 
 count_up = 0
@@ -55,6 +45,12 @@ while cap.isOpened():
     # Read a frame from the video
     success, frame = cap.read()
     print(frame.shape)
+
+    if not success:
+            cap.release()
+            cap = cv2.VideoCapture("rtsp://admin:Hik12345@192.168.30.31:554/Streaming/channels/101")
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            continue
 
     if success:
         # Run YOLOv8 tracking on the frame, persisting tracks between frames
@@ -173,7 +169,7 @@ while cap.isOpened():
         cv2.imshow("YOLOv8 Tracking", annotated_frame)
 
         # Write the annotated frame to the output video
-        out.write(annotated_frame)
+        # out.write(annotated_frame)
 
         # Break the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord("q"):
